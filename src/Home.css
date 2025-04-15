@@ -1,86 +1,86 @@
-  body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 40px;
-    background-color: #fff;
-  }
-  
-  h1 {
-    font-size: 36px;
-    font-weight: bold;
-    margin-bottom: 20px;
-  }
-  
-  .event-card {
-    background-color: #f6d337;
-    border-radius: 12px;
-    padding: 12px;
-    display: flex;
-    align-items: center;
-    margin-bottom: 20px;
-  }
-  
-  .date-box {
-    background-color: #a3842f;
-    color: white;
-    text-align: center;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: bold;
-    margin-right: 15px;
-    min-width: 50px;
-  }
-  
-  .date-box div:last-child {
-    font-weight: normal;
-    font-size: 13px;
-  }
-  
-  .event-info {
-    color: white;
-  }
-  
-  .event-info .title {
-    font-weight: bold;
-    font-size: 16px;
-    margin-bottom: 4px;
-  }
-  
-  .event-info .time {
-    font-size: 14px;
-  }
-  
-  .grid-buttons {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-    margin-top: 30px;
-  }
-  
-  .grid-buttons .button-tile {
-    background-color: #FDF9DC;  /*Updated tile color*/
-    border-radius: 16px;
-    text-align: center;
-    padding: 20px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 1px 2px 5px rgba(0,0,0,0.1);
-    transition: background 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 40px;
+  background-color: #fff;
+}
 
-  .button-tile span {
-    margin-top: 8px; /* adds some spacing between the icon and the text */
-  }
+h1 {
+  font-size: 36px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
 
-  .button-tile:hover {
-    background-color: #f0e6b0;
-  }
-    
-  .button-back {
-    background-color: #ffffff;
-  }
+.event-card {
+  background-color: #f6d337;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.date-box {
+  background-color: #a3842f;
+  color: white;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  margin-right: 15px;
+  min-width: 50px;
+}
+
+.date-box div:last-child {
+  font-weight: normal;
+  font-size: 13px;
+}
+
+.event-info {
+  color: white;
+}
+
+.event-info .title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.event-info .time {
+  font-size: 14px;
+}
+
+.grid-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 30px;
+}
+
+.grid-buttons .button-tile {
+  background-color: #FDF9DC;  /*Updated tile color*/
+  border-radius: 16px;
+  text-align: center;
+  padding: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 1px 2px 5px rgba(0,0,0,0.1);
+  transition: background 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-tile span {
+  margin-top: 8px; /* adds some spacing between the icon and the text */
+}
+
+.button-tile:hover {
+  background-color: #f0e6b0;
+}
+  
+.button-back {
+  background-color: #ffffff;
+}
