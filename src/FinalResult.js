@@ -1,11 +1,50 @@
-import { useContext } from 'react';
-import { EventContext } from './EventContext';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { fetchEventByID } from './firebaseHelpers';
 import './Voting.css';
 import './App.css';
 
 function FinalResult() {
-  const { votes } = useContext(EventContext);
+  const [votes, setVotes] = useState({});
+  const [eventOptions, setEventOptions] = useState({ theme: [], venue: [], dates: [] });
+  const [loading, setLoading] = useState(true);
+  const eventID = localStorage.getItem("eventID");
+
+  useEffect(() => {
+    const loadVotes = async () => {
+      const event = await fetchEventByID(eventID);
+      if (event) {
+        setVotes(aggregateVotes(event.votes || {}));
+        setEventOptions({
+          theme: event.theme || [],
+          venue: event.venue || [],
+          dates: event.dates || [],
+        });
+        setLoading(false);
+      }
+    };
+
+    loadVotes();
+    const interval = setInterval(loadVotes, 3000); // Refresh every 3s
+    return () => clearInterval(interval);
+  }, [eventID]);
+
+  const aggregateVotes = (userVotes) => {
+    const categories = ['theme', 'venue', 'dates'];
+    const result = {};
+
+    for (const category of categories) {
+      result[category] = {};
+      for (const uid in userVotes) {
+        const categoryVotes = userVotes[uid][category];
+        for (const option in categoryVotes) {
+          result[category][option] = (result[category][option] || 0) + categoryVotes[option];
+        }
+      }
+    }
+
+    return result;
+  };
 
   const getHighestVoteOption = (category) => {
     const categoryVotes = votes[category];
@@ -22,10 +61,9 @@ function FinalResult() {
 
   return (
     <div className="container">
-      {/* Progress bar section */}
       <div className="progress-container">
-        <div className="progress-bar" style={{ width: '70%', backgroundColor: '#ffc107' }} />
-        <div className="progress-percentage">70%</div>
+        <div className="progress-bar" style={{ width: '80%', backgroundColor: '#ffc107' }} />
+        <div className="progress-percentage">80%</div>
       </div>
 
       <div className="d-flex align-items-center justify-content-between mb-4 position-relative">
@@ -35,11 +73,10 @@ function FinalResult() {
         <h1 className="position-absolute start-50 translate-middle-x m-0 text-nowrap">Final Result</h1>
       </div>
 
-      {/* Display final results (budget removed) */}
       {['theme', 'venue', 'dates'].map((category) => (
         <div key={category}>
           <h3>{category.charAt(0).toUpperCase() + category.slice(1)}:</h3>
-          <p>{getHighestVoteOption(category)}</p>
+          <p>{loading ? 'Loading...' : getHighestVoteOption(category)}</p>
         </div>
       ))}
 

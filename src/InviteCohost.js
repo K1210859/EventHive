@@ -5,6 +5,7 @@ import { auth } from './firebase';
 import {
   addCohostToFirestore,
   updateEventInFirestore,
+  deleteCohostFromFirestore,
   fetchEventByID
 } from './firebaseHelpers';
 import './InviteCohost.css';
@@ -19,27 +20,22 @@ function InviteCohost() {
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    const loadCohosts = async () => {
-      const eventID = localStorage.getItem("eventID");
-      const continuePlanning = localStorage.getItem("continuePlanning") === "true";
+    const eventID = localStorage.getItem("eventID");
 
-      if (continuePlanning) {
-        const event = await fetchEventByID(eventID);
-        if (event?.cohosts) {
-          setCohosts(event.cohosts);
-          localStorage.setItem("cohosts", JSON.stringify(event.cohosts));
-        }
-        if (event?.hostID === auth.currentUser?.uid) {
-          setIsHost(true);
-        }
-      } else {
-        const savedCohosts = JSON.parse(localStorage.getItem("cohosts")) || [];
-        setCohosts(savedCohosts);
+    const loadCohosts = async () => {
+      const event = await fetchEventByID(eventID);
+      if (event?.cohosts) {
+        setCohosts(event.cohosts);
+        localStorage.setItem("cohosts", JSON.stringify(event.cohosts));
+      }
+      if (event?.hostID === auth.currentUser?.uid) {
         setIsHost(true);
       }
     };
 
     loadCohosts();
+    const interval = setInterval(loadCohosts, 3000); // auto-refresh every 3s
+    return () => clearInterval(interval);
   }, [setCohosts]);
 
   const handleAddCohost = () => {
@@ -52,7 +48,6 @@ function InviteCohost() {
     const newCohosts = [...cohosts, { name: cohostName, email: cohostEmail }];
     setCohosts(newCohosts);
     localStorage.setItem("cohosts", JSON.stringify(newCohosts));
-
     setCohostName("");
     setCohostEmail("");
   };
@@ -70,26 +65,47 @@ function InviteCohost() {
     setTimeout(() => setSuccessMessage(""), 2000);
   };
 
-  const removeCohost = (index) => {
+  const removeCohost = async (index) => {
+    const eventID = localStorage.getItem("eventID");
+    const removed = cohosts[index];
     const updated = cohosts.filter((_, i) => i !== index);
+  
     setCohosts(updated);
     localStorage.setItem("cohosts", JSON.stringify(updated));
+  
+    await updateEventInFirestore(eventID, { cohosts: updated });
+  
+    // 🔥 Delete from cohosts collection
+    await deleteCohostFromFirestore(eventID, removed.email);
   };
 
-  const tryAddCohost = () => {
+  const tryAddCohost = async () => {
     const trimmedName = cohostName.trim();
     const trimmedEmail = cohostEmail.trim();
+    const eventID = localStorage.getItem("eventID");
   
-    if (trimmedName === "" || trimmedEmail === "") {
-      return;
+    if (trimmedName === "" || trimmedEmail === "") return;
+  
+    const newCohost = { name: trimmedName, email: trimmedEmail };
+    const updatedCohosts = [...cohosts, newCohost];
+  
+    try {
+      // First: add to the cohosts collection (avoids duplicates automatically)
+      await addCohostToFirestore(eventID, trimmedName, trimmedEmail);
+  
+      // Then: update the event document's cohosts array
+      await updateEventInFirestore(eventID, { cohosts: updatedCohosts });
+  
+      // Then: update local state and UI
+      setCohosts(updatedCohosts);
+      localStorage.setItem("cohosts", JSON.stringify(updatedCohosts));
+      setCohostName("");
+      setCohostEmail("");
+    } catch (err) {
+      console.error("Failed to add cohost:", err);
+      setShowWarning(true);
+      setTimeout(() => setShowWarning(false), 3000);
     }
-  
-    const newCohosts = [...cohosts, { name: trimmedName, email: trimmedEmail }];
-    setCohosts(newCohosts);
-    localStorage.setItem("cohosts", JSON.stringify(newCohosts));
-  
-    setCohostName("");
-    setCohostEmail("");
   };  
 
   return (
@@ -131,15 +147,12 @@ function InviteCohost() {
         </div>
       )}
 
-
       <div className='cohost-list'>
         {cohosts.map((cohost, index) => (
           <div key={index} className="cohost-name-box">
             {cohost.name} ({cohost.email})
             {isHost && (
-              <button className="remove-button" onClick={() => removeCohost(index)}>
-                ✕
-              </button>
+              <button className="remove-button" onClick={() => removeCohost(index)}>✕</button>
             )}
           </div>
         ))}

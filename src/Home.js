@@ -1,4 +1,3 @@
-// Home.js
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import MenuSidebar from './components/MenuSideBar';
@@ -11,25 +10,51 @@ function Home() {
   const [events, setEvents] = useState([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        const userEvents = await fetchUserEvents(user.uid, user.email);
-        setEvents(userEvents);
+  const getTopVotedOption = (votes, category) => {
+    const scoreMap = {};
+
+    Object.values(votes || {}).forEach(userVotes => {
+      const categoryVotes = userVotes?.[category];
+      if (categoryVotes) {
+        Object.entries(categoryVotes).forEach(([option, score]) => {
+          scoreMap[option] = (scoreMap[option] || 0) + score;
+        });
       }
-    };
-    fetchEvents();
+    });
+
+    const sorted = Object.entries(scoreMap).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? sorted[0][0] : null;
+  };
+
+  const loadUserEvents = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const userEvents = await fetchUserEvents(user.uid, user.email);
+    const enrichedEvents = await Promise.all(userEvents.map(async (event) => {
+      const fullEvent = await fetchEventByID(event.id);
+      const topDate = getTopVotedOption(fullEvent.votes, 'dates');
+      const topVenue = getTopVotedOption(fullEvent.votes, 'venue');
+      return {
+        ...event,
+        topDate,
+        topVenue,
+      };
+    }));
+
+    setEvents(enrichedEvents);
+  };
+
+  useEffect(() => {
+    loadUserEvents();
+    const interval = setInterval(() => {
+      loadUserEvents();
+    }, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleNewEvent = () => {
-    localStorage.removeItem("eventID");
-    localStorage.removeItem("continuePlanning");
-    localStorage.removeItem("eventName");
-    localStorage.removeItem("theme");
-    localStorage.removeItem("dates");
-    localStorage.removeItem("venue");
-    localStorage.removeItem("cohosts");
+    localStorage.clear();
     navigate("/plan");
   };
 
@@ -71,8 +96,8 @@ function Home() {
         events.map((event) => (
           <div key={event.id} className="event-card">
             <h3>{event.name}</h3>
-            <p>Date: {event.date || 'TBD'}</p>
-            <p>Location: {event.location || 'TBD'}</p>
+            <p>Date: {event.topDate || 'TBD'}</p>
+            <p>Location: {event.topVenue || 'TBD'}</p>
             <button
               className="next-button active"
               onClick={() => handleContinuePlanning(event.id)}
