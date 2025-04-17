@@ -16,13 +16,14 @@ function SelectDate() {
     const eventID = localStorage.getItem("eventID");
   
     const loadDates = async () => {
-      const continuePlanning = localStorage.getItem("continuePlanning") === "true";
-  
       if (!eventID) return;
+      const data = await fetchEventByID(eventID);
   
-      if (continuePlanning) {
-        const data = await fetchEventByID(eventID);
-        if (data?.dates) {
+      if (data?.dates) {
+        const currentDatesString = JSON.stringify(eventOptions.dates || []);
+        const newDatesString = JSON.stringify(data.dates);
+  
+        if (currentDatesString !== newDatesString) {
           setEventOptions(prev => ({ ...prev, dates: data.dates }));
           localStorage.setItem("dates", JSON.stringify(data.dates));
         }
@@ -32,9 +33,8 @@ function SelectDate() {
     loadDates(); // load once on mount
   
     const interval = setInterval(loadDates, 1000); // refresh every 1s
-  
     return () => clearInterval(interval); // cleanup
-  }, [setEventOptions]);
+  }, [eventOptions.dates, setEventOptions]);
   
   const toLocalDateString = (date) => {
     const year = date.getFullYear();
