@@ -1,63 +1,112 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchEventByID } from './firebaseHelpers';
+import { fetchEventByID, fetchUserNameByUID } from './firebaseHelpers';
 import './Voting.css';
 import './App.css';
 
 function FinalResult() {
-  const [votes, setVotes] = useState({});
-  const [eventOptions, setEventOptions] = useState({ theme: [], venue: [], dates: [] });
+  const [eventOptions, setEventOptions] = useState({});
+  const [finalVotes, setFinalVotes] = useState({});
+  const [missingVoters, setMissingVoters] = useState([]);
   const [loading, setLoading] = useState(true);
-  const eventID = localStorage.getItem("eventID");
+
+  const displayLabel = (option) => {
+    if (typeof option === 'string') return option;
+    if (option?.name) return option.name;
+    if (option?.email) return option.email;
+    return 'Unknown Option';
+  };
+
+  const getAllOptionsInCategory = (category) => {
+    const fromEvent = eventOptions[category] || [];
+    const fromVotes = Object.values(finalVotes)
+      .flatMap(vote => Object.keys(vote?.[category] || {}))
+      .map(o => {
+        try {
+          return JSON.parse(o);
+        } catch {
+          return o;
+        }
+      });
+
+    const combined = [...fromEvent, ...fromVotes];
+    const unique = [];
+    const seen = new Set();
+
+    for (const option of combined) {
+      const key = typeof option === 'string' ? option : JSON.stringify(option);
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(option);
+      }
+    }
+
+    return unique;
+  };
+
+  const getRankedOptions = (category) => {
+    const allOptions = getAllOptionsInCategory(category);
+    const scores = {};
+
+    for (const userID in finalVotes) {
+      const categoryVotes = finalVotes[userID]?.[category] || {};
+      allOptions.forEach(option => {
+        const key = typeof option === 'string' ? option : JSON.stringify(option);
+        scores[key] = (scores[key] || 0) + (categoryVotes[key] || 0);
+      });
+    }
+
+    return Object.entries(scores)
+      .sort((a, b) => b[1] - a[1])
+      .map(([rawKey, score]) => {
+        let option;
+        try {
+          option = JSON.parse(rawKey);
+        } catch {
+          option = rawKey;
+        }
+        return { option, score };
+      });
+  };
 
   useEffect(() => {
-    const loadVotes = async () => {
+    const loadData = async () => {
+      const eventID = localStorage.getItem('eventID');
+      if (!eventID) return;
+
       const event = await fetchEventByID(eventID);
-      if (event) {
-        setVotes(aggregateVotes(event.votes || {}));
-        setEventOptions({
-          theme: event.theme || [],
-          venue: event.venue || [],
-          dates: event.dates || [],
-        });
-        setLoading(false);
-      }
-    };
+      if (!event) return;
 
-    loadVotes();
-    const interval = setInterval(loadVotes, 3000); // Refresh every 3s
-    return () => clearInterval(interval);
-  }, [eventID]);
+      setEventOptions({
+        theme: event.theme || [],
+        venue: event.venue || [],
+        dates: event.dates || []
+      });
 
-  const aggregateVotes = (userVotes) => {
-    const categories = ['theme', 'venue', 'dates'];
-    const result = {};
+      const votes = event.votes || {};
+      setFinalVotes(votes);
 
-    for (const category of categories) {
-      result[category] = {};
-      for (const uid in userVotes) {
-        const categoryVotes = userVotes[uid][category];
-        for (const option in categoryVotes) {
-          result[category][option] = (result[category][option] || 0) + categoryVotes[option];
+      const requiredIDs = [
+        event.hostID,
+        ...(event.cohosts || []).map(c => c.userID).filter(Boolean),
+      ];
+
+      const missing = [];
+      for (const uid of requiredIDs) {
+        if (!votes[uid]) {
+          const name = await fetchUserNameByUID(uid);
+          missing.push(name || 'Unknown');
         }
       }
-    }
 
-    return result;
-  };
+      setMissingVoters(missing);
+      setLoading(false);
+    };
 
-  const getHighestVoteOption = (category) => {
-    const categoryVotes = votes[category];
-    if (categoryVotes && Object.keys(categoryVotes).length > 0) {
-      const maxVotes = Math.max(...Object.values(categoryVotes));
-      const highestOption = Object.keys(categoryVotes).find(
-        (option) => categoryVotes[option] === maxVotes
-      );
-      return highestOption;
-    } else {
-      return "No votes yet";
-    }
-  };
+    loadData();
+    const interval = setInterval(loadData, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="container">
@@ -70,20 +119,48 @@ function FinalResult() {
         <Link to="/voting" className="btn back-btn rounded-circle shadow-sm back-icon">
           <i className="bi bi-arrow-left-short"></i>
         </Link>
-        <h1 className="position-absolute start-50 translate-middle-x m-0 text-nowrap">Final Result</h1>
+        <h1 className="position-absolute start-50 translate-middle-x m-0 text-nowrap">Final Rankings</h1>
       </div>
 
-      {['theme', 'venue', 'dates'].map((category) => (
-        <div key={category}>
-          <h3>{category.charAt(0).toUpperCase() + category.slice(1)}:</h3>
-          <p>{loading ? 'Loading...' : getHighestVoteOption(category)}</p>
+      {Object.keys(eventOptions).map((category) => {
+        const ranked = getRankedOptions(category);
+        return (
+          <div key={category} className="category-section">
+            <h3>{category.charAt(0).toUpperCase() + category.slice(1)}:</h3>
+            <ol className="ranked-list">
+              {ranked.map(({ option, score }, index) => (
+                <li key={index} className={index === 0 ? 'top-pick' : ''}>
+                  {displayLabel(option)} <span className="score-tag">({score} pts)</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        );
+      })}
+
+      {!loading && missingVoters.length > 0 && (
+        <div className="alert-popup">
+          Waiting on:
+          <ul>
+            {missingVoters.map((name, idx) => (
+              <li key={idx}>{name}</li>
+            ))}
+          </ul>
         </div>
-      ))}
+      )}
 
       <div className="next-button-row">
-        <Link to="/tasks" className="next-button">
-          Next
-        </Link>
+        {loading ? (
+          <button className="next-button disabled" disabled>Loading...</button>
+        ) : missingVoters.length === 0 ? (
+          <Link to="/tasks" className="next-button active" style={{ backgroundColor: '#ffcf34', color: '#000' }}>
+            Next
+          </Link>
+        ) : (
+          <button className="next-button disabled" disabled style={{ backgroundColor: '#ccc', color: '#666' }}>
+            Next
+          </button>
+        )}
       </div>
     </div>
   );
